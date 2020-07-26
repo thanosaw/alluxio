@@ -16,14 +16,9 @@ import alluxio.Constants;
 import alluxio.client.file.URIStatus;
 import alluxio.client.file.cache.CacheManager;
 import alluxio.client.file.cache.LocalCacheFileInStream;
-import alluxio.conf.AlluxioConfiguration;
-import alluxio.conf.AlluxioProperties;
-import alluxio.conf.InstancedConfiguration;
-import alluxio.conf.Source;
 import alluxio.grpc.OpenFilePOptions;
 import alluxio.metrics.MetricsConfig;
 import alluxio.metrics.MetricsSystem;
-import alluxio.util.ConfigurationUtils;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -50,7 +45,7 @@ import java.util.Set;
  */
 public class LocalCacheFileSystem extends org.apache.hadoop.fs.FileSystem {
   private static final Logger LOG = LoggerFactory.getLogger(LocalCacheFileSystem.class);
-  private static final Set SUPPORTED_FS = new HashSet<String>() {
+  private static final Set<String> SUPPORTED_FS = new HashSet<String>() {
     {
       add(Constants.SCHEME);
       add("ws");
@@ -60,25 +55,23 @@ public class LocalCacheFileSystem extends org.apache.hadoop.fs.FileSystem {
   /** The external Hadoop filesystem to query on cache miss. */
   private final org.apache.hadoop.fs.FileSystem mExternalFileSystem;
   /** Wrapper as an Alluxio filesystem of the external Hadoop filesystem. */
-  private final AlluxioHdfsFileSystem mExternalFileSystemWrapper;
+  private AlluxioHdfsFileSystem mExternalFileSystemWrapper;
   private CacheManager mCacheManager;
   private org.apache.hadoop.conf.Configuration mHadoopConf;
-  private AlluxioConfiguration mAlluxioConf;
 
   /**
    * @param fileSystem File System instance
    */
   public LocalCacheFileSystem(org.apache.hadoop.fs.FileSystem fileSystem) {
     mExternalFileSystem = Preconditions.checkNotNull(fileSystem, "filesystem");
-    mExternalFileSystemWrapper = new AlluxioHdfsFileSystem(mExternalFileSystem);
   }
 
   @Override
   public synchronized void initialize(URI uri, org.apache.hadoop.conf.Configuration conf)
       throws IOException {
-    if (!SUPPORTED_FS.contains(mExternalFileSystem.getScheme())) {
+    if (!SUPPORTED_FS.contains(uri.getScheme())) {
       throw new UnsupportedOperationException(
-          mExternalFileSystem.getScheme() + " is not supported as the external filesystem.");
+          uri.getScheme() + " is not supported as the external filesystem.");
     }
     super.initialize(uri, conf);
     mHadoopConf = conf;
@@ -86,24 +79,14 @@ public class LocalCacheFileSystem extends org.apache.hadoop.fs.FileSystem {
     // Set statistics
     setConf(conf);
 
-    // Take hadoop configuration to merge to Alluxio configuration
-    Map<String, Object> hadoopConfProperties =
-        HadoopConfigurationUtils.getConfigurationFromHadoop(conf);
-    LOG.info("Creating Alluxio configuration from Hadoop configuration {}", hadoopConfProperties);
-    AlluxioProperties alluxioProps = ConfigurationUtils.defaults();
-    // Merge relevant Hadoop configuration into Alluxio's configuration.
-    alluxioProps.merge(hadoopConfProperties, Source.RUNTIME);
-    // Creating a new instanced configuration from an AlluxioProperties object isn't expensive.
-    mAlluxioConf = new InstancedConfiguration(alluxioProps);
-
     // Handle metrics
     Properties metricsProperties = new Properties();
     for (Map.Entry<String, String> entry : conf) {
       metricsProperties.setProperty(entry.getKey(), entry.getValue());
     }
     MetricsSystem.startSinksFromConfig(new MetricsConfig(metricsProperties));
-
-    mCacheManager = CacheManager.Factory.get(mAlluxioConf);
+    mExternalFileSystemWrapper = new AlluxioHdfsFileSystem(mExternalFileSystem, conf);
+    mCacheManager = CacheManager.Factory.get(mExternalFileSystemWrapper.getConf());
   }
 
   @Override
