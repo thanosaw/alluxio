@@ -93,7 +93,7 @@ t; Request ID: 158681CA87E59BA0; S3 Extended Request ID: 2d47b54e-7dd4-4e32-bc6e
 ### DNS解析-无法执行HTTP请求
 
 如果遇到这样的异常，则可能是Alluxio属性
-[`alluxio.underfs.s3.disable.dns.buckets`]({{'/en/reference/Properties-List.html'| relativize_url}}#alluxio.underfs.s3.disable.dns.buckets)
+[`alluxio.underfs.s3.disable.dns.buckets`]({{ '/en/reference/Properties-List.html' | relativize_url}}#alluxio.underfs.s3.disable.dns.buckets)
 设置为`false`。
 为MinIO将此值设置为`true`将允许Alluxio解析正确的存储桶位置。
 
